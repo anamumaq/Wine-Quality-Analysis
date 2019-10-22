@@ -1,0 +1,258 @@
+---
+title: "Análisis Calidad de Vino"
+author: "Ing. Ana Munoz Maquera"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+    code_folding: show
+    lightbox: TRUE
+---
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+
+library(knitr)
+library(rmdformats)
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+
+```
+
+# Informacion General - Calidad de Vino
+```{r, warning = FALSE}
+BDwine = read.csv("winequality-white.csv", sep = ";", header = TRUE) 
+library(ggplot2)
+library(dplyr)
+library(corrplot) 
+```
+
+## Conociendo mi base de datos
+
+### Principales Características
+La BD brindada consta de las siguientes características:
+```{r, echo=TRUE}
+summary(BDwine)
+str(BDwine)
+```
+
+Se puede apreciar que la BD no contempla valores faltantes o desconocidos, por lo que se prosigue a graficar para el análisis.
+
+### Histograma de la BD según su calidad
+
+La distribución de la BD según su calidad muestra mayor cantidad de vinos entre las calidades 5 y 7, mientras que el resto de calidades tienen menor cantidad 
+```{r}
+ggplot(BDwine, aes(x = BDwine$quality))+
+  geom_histogram(binwidth = 0.5) +
+  xlab("Calidad de Vino") + ylab ("Frecuencia") +
+  ggtitle("Distribucion de datos segun calidad")
+```
+
+## Correlación entre las variables de la BD
+
+El grafico siguiente muestra la relacion de las variables entre ellas. 
+Se destaca la relacion de:
+
+- Calidad Vs Alcohol
+- Densidad Vs Alcohol 
+- Densidad VS Azucar Residual
+- Calidad VS Acidez Fija
+- Calidad Vs Acidez Volatil
+
+```{r, echo=TRUE}
+mat.cor = cor(BDwine[-13])
+corrplot(mat.cor, method = "circle")
+```
+
+
+# Reclasificacion de Datos
+
+Para un mejor estudio de la BD, estos se agruparán en tres principales secciones según la calidad de vino.
+
+- Calidad 8 y Calidad 9 = Calidad *Alta*
+- Calidad 3 y Calidad 4 = Calidad *Baja*
+- Calidad 7, 6 y 5 = Calidad *Media*
+
+## Nueva Varible Classify
+
+La clasificación se guardará en una variable llamada ***Classify***
+```{r, echo=TRUE}
+BDwine$Classify = ifelse(BDwine$quality >= 8, "Alta", 
+  ifelse(BDwine$quality <= 3, "Baja","Media"))
+summary(BDwine$Classify)
+str(BDwine$Classify)
+
+```
+
+### Análisis por Calidad Clasificación
+
+Se realiza un análisis de las correlaciones de Densidad y Alcohol según su clasificación de calidad.
+
+- Podemos deducir que los vino con calidad más alta tienen en su mayoría un alto grado de alcohol y por lo tanto menor densidad
+- La densidad y el grado de alcohol de los vinos de calidad Baja son muy dispersos por lo que no se puede realizar una deducción
+- Los vino con calidad Media tienen datos picos fuera de la media
+```{r}
+ggplot(BDwine, aes(x = BDwine$density, y = BDwine$alcohol)) +
+  xlab("Densidad") + ylab ("Alcohol") +
+  ggtitle("Densidad vs Alcohol") +
+  geom_point() +  
+  facet_wrap(~ BDwine$Classify, scale = "free_y")+
+  geom_smooth()
+
+```
+
+## Partición de la BD
+
+Para un mejor analisis segmentado, se separa la BD en tres Dataframe, Alto, Medio y Bajo
+```{r}
+BDwine_splitted = split(BDwine, BDwine$Classify)
+
+BDwine_Alta = BDwine_splitted$Alta
+BDwine_Baja = BDwine_splitted$Baja
+BDwine_Media = BDwine_splitted$Media
+
+summary(BDwine_Alta)
+summary(BDwine_Media)
+summary(BDwine_Baja)
+```
+
+# Análisis por variable
+
+Una vez tengo la BD partida, puedo realizar un análisis con cada una de estas para un análisis detallado
+
+## Calidad Alta
+
+Para los vinos de calidad alta que cuentan con mayor  alcohol tiene menor grado de densidad.
+```{r}
+ggplot(BDwine_Alta, aes(x = BDwine_Alta$density, y = BDwine_Alta$alcohol)) +
+  xlab("Densidad") + ylab ("Alcohol") +
+  ggtitle("Densidad vs Alcohol Calidad Alta") +
+  geom_point() +  
+  geom_smooth()
+```
+
+## Calidad Baja
+
+En caso de los vinos de calidad Baja, grado de alcohol de estos es muy variado, por lo que su grado de densidad también es muy variada.
+```{r}
+ggplot(BDwine_Baja, aes(x = BDwine_Baja$density, y = BDwine_Baja$alcohol)) +
+  xlab("Densidad") + ylab ("Alcohol") +
+  ggtitle("Densidad vs Alcohol Calidad Baja") +
+  geom_point() +  
+  geom_smooth()
+```
+
+## Calidad Media
+
+Los vinos de calidad media, tienen un comportamiento de a mayor alcohol menor densidad del vino. Sin embargo existen vinos de esa calidad que cuentan con grados de densida superiores a 1, siendo picos de toda la BD
+```{r}
+ggplot(BDwine_Media, aes(x = BDwine_Media$density, y = BDwine_Media$alcohol)) +
+  xlab("Densidad") + ylab ("Alcohol") +
+  ggtitle("Densidad vs Alcohol Calidad Media") +
+  geom_point()
+```
+
+# Relacion entre variables por Calidad
+
+Se estudiará la relación de las diferentes de variables Vs Calidad segmentado por la variable ***Classify***
+
+## Calidad vs Alcohol
+
+Para el gráfico siguiente, los vinos con calidad alta tiene mayor grado de alcohol que el resto de vinos
+
+```{r}
+ggplot(data = BDwine, aes(x = BDwine$quality, y = BDwine$alcohol)) +  
+  geom_boxplot(aes(fill = as.character(BDwine$Classify))) + 
+  facet_wrap(~ BDwine$Classify, scale = "free_y")+
+  ylab("Alcohol") + xlab("Calidad")+
+  guides(fill = guide_legend(title="Calidad"))+
+  ggtitle("Relacion Calidad vs Alcohol por Clasificacion")
+```
+
+## Calidad vs Total Dioxido de Sulfuro
+
+El dioxido de sulfuro tiene mayor concentración en vinos con calidad alta
+
+```{r}
+ggplot(data = BDwine, aes(x = BDwine$quality, y = BDwine$total.sulfur.dioxide)) +  
+  geom_boxplot(aes(fill = as.character(BDwine$Classify))) +    
+  facet_wrap(~ BDwine$Classify, scale = "free_y") +
+  ylab("Total Sulfuro Dioxido") + xlab("Calidad") +
+  guides(fill = guide_legend(title="Calidad")) +
+  ggtitle("Relacion Calidad vs Total Dioxido de Sulfuro por Clasificacion")
+```
+
+## Calidad vs Volatile Acidity
+
+Los vinos de calidad baja y calidad media tienen en promedio la misma concentración de Volatile Acidity. Sin embargo, la calidad baja tiene mayores valores de Volatile Acidity
+
+```{r}
+ggplot(data = BDwine, aes(x = BDwine$quality, y = BDwine$volatile.acidity)) +  
+  geom_boxplot(aes(fill = as.character(BDwine$Classify))) +   
+  facet_wrap(~ BDwine$Classify, scale = "free_y") +
+  ylab("Valatile Acidity") + xlab("Calidad") +
+  guides(fill = guide_legend(title="Calidad")) +
+  ggtitle("Relacion Calidad vs Volatile Acidity por Clasificacion")
+```
+
+## Calidad vs Fixed Acidity
+
+Para los vinos de calidad alta existe una mayor concentración de Fixed Acidity, mientras los de calidad media, tienen menores valores.
+```{r}
+ggplot(data = BDwine, aes(x = BDwine$quality, y = BDwine$fixed.acidity)) +  
+  geom_boxplot(aes(fill = as.character(BDwine$Classify))) +   
+  facet_wrap(~ BDwine$Classify, scale = "free_y") +
+  ylab("Fixed Acidity") + xlab("Calidad") +
+  guides(fill = guide_legend(title="Calidad")) +
+  ggtitle("Relacion Calidad vs Fixed Acidity por Clasificacion")
+```
+
+# Analisis a fondo de la calidad Media
+
+Debido a la cantidad de datos en el rango de calidad media, es necesario realizar un análisis de solo la Calidad Media.
+
+## Distribución de datos Calidad Media
+
+La mayor cantidad de datos con clasificación media tienen una calidad de 6
+```{r}
+ggplot(BDwine_Media, aes(x = BDwine_Media$quality))+
+  geom_histogram(binwidth = 0.5) +
+  xlab("Calidad de Vino") + ylab ("Frecuencia") +
+  ggtitle("Distribucion de datos segun calidad")
+
+```
+
+## Relación Densidad Vs Alcohol
+
+En los datos podemos visibilizar que la relación densidad y alcohol en la calidad 4 es directa.
+Los vinos con calidad 6 tienen densidades sobre 1 y fuera de la media del resto de datos.
+```{r}
+ggplot(BDwine_Media, aes(x = BDwine_Media$density, y = BDwine_Media$alcohol)) +
+  xlab("Densidad") + ylab ("Alcohol") +
+  ggtitle("Densidad vs Alcohol") +
+  geom_point() +  
+  facet_wrap(~ BDwine_Media$quality, scale = "free_y")+
+  geom_smooth()
+```
+
+
+## Calidad vs Fixed Acidity
+
+El vino con mayor calidad dentro de la clasificación media, tiene una fixed acidity mayor al resto de la clasificación media.
+Las calidades 4, 5 y 6 tiene el mismo grado de Fixed Acidity
+```{r}
+ggplot(BDwine_Media, aes(x = BDwine_Media$quality, y = BDwine_Media$fixed.acidity)) +  
+  geom_boxplot(aes(fill = as.character(BDwine_Media$quality))) +   
+  facet_wrap(~ BDwine_Media$quality, scale = "free_y") +
+  ylab("Fixed Acidity") + xlab("Calidad") +
+  guides(fill = guide_legend(title="Calidad")) +
+  ggtitle("Relacion Calidad vs Fixed Acidity por Clasificacion")
+```
+
